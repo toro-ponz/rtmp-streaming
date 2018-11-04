@@ -1,0 +1,62 @@
+version: '3'
+
+services:
+  redis:
+    build: ./docker/redis
+    command: redis-server --appendonly yes --requirepass foobared
+    container_name: rtmp-redis
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - 6379:6379
+    volumes:
+      - ./docker/redis/bin:/data
+
+  rtmp:
+    build: ./docker/rtmp
+    container_name: rtmp-server
+    volumes:
+      - ./streaming/live:/usr/local/nginx/html/hls
+      - ./docker/rtmp/nginx.conf:/etc/nginx/nginx.conf
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - 1935:1935
+
+  streaming:
+    build: ./docker/streaming
+    container_name: streaming-server
+    volumes:
+      - ./streaming/live:/var/www/html/public/streaming/live
+      - ./streaming/video:/var/www/html/public/streaming/video
+      - ./docker/streaming/nginx.conf:/etc/nginx/nginx.conf
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - 7500:7500
+
+  app:
+    build: ./docker/app
+    command: go run src/app/main.go
+    container_name: rtmp-app
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - 5000:5000
+    volumes:
+      - .:/go/src
+    depends_on:
+      - redis
+
+  web:
+    build: ./docker/web
+    container_name: rtmp-web
+    ports:
+      - 80:80
+    volumes:
+      - ./public:/var/www/html/public
+      - ./docker/web/nginx.conf:/etc/nginx/conf.d/default.conf
+    environment:
+      TZ: Asia/Tokyo
+    depends_on:
+      - app
